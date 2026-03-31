@@ -144,6 +144,28 @@ def main():
     print("Database populated successfully!\n")
 
     # =========================================================================
+    # Index Definitions
+    # =========================================================================
+    index_defs = {
+        'Student':    [('s_id',              'int', 4)],
+        'Enrollment': [('e_student_id',      'int', 4),
+                       ('e_section_id',      'int', 4),
+                       ('e_grade',           'str', 2)],
+        'Section':    [('sec_id',            'int', 4),
+                       ('sec_course_id',     'int', 4),
+                       ('sec_instructor_id', 'int', 4),
+                       ('sec_semester',      'str', 10),
+                       ('sec_year',          'int', 4)],
+        'Course':     [('c_id',              'int', 4),
+                       ('c_department',      'str', 30)],
+        'Instructor': [('i_id',              'int', 4)],
+    }
+
+    composite_index_defs = {
+        'Section': [( ('sec_semester', 'sec_year'), ('str', 'int'), (10, 4) )]
+    }
+
+    # =========================================================================
     # Index Creation (for 'index' and 'full' modes)
     # =========================================================================
     indexes = None
@@ -151,7 +173,7 @@ def main():
         print("Building indexes...")
         from solution import create_indexes
         tx_idx = Transaction(db.fm, db.lm, db.bm)
-        indexes = create_indexes(db, tx_idx)
+        indexes = create_indexes(db, tx_idx, index_defs, composite_index_defs)
         tx_idx.commit()
         print("Indexes built successfully!\n")
 

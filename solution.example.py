@@ -65,6 +65,11 @@ class CompositeIndex:
         raise NotImplementedError
 
 class IndexScan:
+    """
+    A scan that uses an index instead of scanning all table records.
+    Hint: Retrieve the RecordIDs from the index using `search_key`, 
+          then iterate through them and position `table_scan` at each RecordID.
+    """
     def __init__(self, table_scan, index, search_key):
         raise NotImplementedError("IndexScan not implemented")
     def nextRecord(self):
@@ -81,10 +86,29 @@ class IndexScan:
         self.table_scan.closeRecordPage()
 
 class IndexQueryPlanner:
-    def __init__(self, mm, indexes):
+    """
+    A planner that optimizes queries by using indexes for equality conditions (field = constant).
+    Hint: For each table, if an equality predicate matches an available index, 
+          create a custom Plan node that wraps your IndexScan instead of TablePlan.
+    """
+    def __init__(self, mm, indexes, better_planner=None):
         raise NotImplementedError("IndexQueryPlanner not implemented")
     def createPlan(self, tx, query_data):
         raise NotImplementedError
 
-def create_indexes(db, tx):
+def create_indexes(db, tx, index_defs=None, composite_index_defs=None):
+    """
+    Step 1: Instantiate BTreeIndex objects for each entry in index_defs.
+            - `index_defs` is a dict {table_name: [(field_name, field_type, field_length), ...]}
+    
+    Step 2: Instantiate CompositeIndex objects for each entry in composite_index_defs.
+            - `composite_index_defs` is a dict {table_name: [((field_names,...), (field_types,...), (field_lengths,...)), ...]}
+    
+    Step 3: Populate all indexes by scanning each table once.
+    
+    Returns:
+        dict {table_name: {field_key: IndexObject}}
+        - field_key is the field name (str) for BTreeIndex 
+        - field_key is the tuple of field names for CompositeIndex
+    """  
     raise NotImplementedError("create_indexes() not implemented")
