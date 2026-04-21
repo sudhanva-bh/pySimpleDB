@@ -10,6 +10,18 @@ class BetterQueryPlanner:
         self.mm = mm
 
     def createPlan(self, tx, query_data):
+        """
+        Step 1: Create a TablePlan for each table referenced in the query.
+        Step 2: Classify your predicates (terms).
+                - Which terms apply to a single table? (Selection Pushdown)
+                - Which terms apply to two tables? (Join Conditions)
+        Step 3: Apply selection pushdown by wrapping TablePlans with SelectPlans.
+        Step 4: Reorder your joins.
+                - Start with the smallest table.
+                - Iteratively join the next table that has a connecting join condition.
+                - Apply the join condition immediately after the ProductPlan.
+        Step 5: Apply any remaining conditions and project the required fields.
+        """
         table_plans = {}
         for table_name in query_data['tables']:
             table_plans[table_name] = TablePlan(tx, table_name, self.mm)
@@ -181,6 +193,11 @@ class CompositeIndex(BTreeIndex):
 
 
 class IndexScan:
+    """
+    A scan that uses an index instead of scanning all table records.
+    Hint: Retrieve the RecordIDs from the index using `search_key`, 
+          then iterate through them and position `table_scan` at each RecordID.
+    """
     def __init__(self, table_scan, index, search_key):
         self.table_scan = table_scan
         self.rids = index.search(search_key)
@@ -205,6 +222,11 @@ class IndexScan:
 
 
 class IndexQueryPlanner:
+    """
+    A planner that optimizes queries by using indexes for equality conditions (field = constant).
+    Hint: For each table, if an equality predicate matches an available index, 
+          create a custom Plan node that wraps your IndexScan instead of TablePlan.
+    """
     def __init__(self, mm, indexes, better_planner=None):
         self.mm = mm
         self.indexes = indexes
@@ -339,6 +361,20 @@ class IndexQueryPlanner:
 
 
 def create_indexes(db, tx, index_defs=None, composite_index_defs=None):
+    """
+    Step 1: Instantiate BTreeIndex objects for each entry in index_defs.
+            - `index_defs` is a dict {table_name: [(field_name, field_type, field_length), ...]}
+    
+    Step 2: Instantiate CompositeIndex objects for each entry in composite_index_defs.
+            - `composite_index_defs` is a dict {table_name: [((field_names,...), (field_types,...), (field_lengths,...)), ...]}
+    
+    Step 3: Populate all indexes by scanning each table once.
+    
+    Returns:
+        dict {table_name: {field_key: IndexObject}}
+        - field_key is the field name (str) for BTreeIndex 
+        - field_key is the tuple of field names for CompositeIndex
+    """  
     indexes = {}
     if index_defs:
         for t_name, fields in index_defs.items():
