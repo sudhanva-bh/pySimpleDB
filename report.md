@@ -1,8 +1,13 @@
-# Report: Query Optimization and Indexing in pySimpleDB
+# Project 2 Report: Query Optimization and Indexing in pySimpleDB
+
+**Course:** Database Systems  
+**Group:** [Group_number_XXX]
+
+---
 
 ## 1. Setup and Execution Instructions
 
-To execute the application and evaluate the optimizations, run `benchmark.py` via the command line interface. Make sure you are in the project's root directory. 
+To execute our modified database engine and test the optimizations, you must run `benchmark.py` via the command line. Make sure you are in the project's root directory.
 
 **Execution Syntax:**
 ```bash
@@ -10,43 +15,50 @@ python benchmark.py --query [Q1|Q2|Q3|all] --mode [baseline|opt|index|full]
 ```
 
 **Examples:**
-- `python benchmark.py --query Q1 --mode opt`
-- `python benchmark.py --query all --mode full`
+- Run query 1 heavily optimized: `python benchmark.py --query Q1 --mode opt`
+- Run all test suites entirely: `python benchmark.py --query all --mode full`
 
-The evaluated code modifications are exclusively enclosed within `solution.py`.
-
----
-
-## 2. Design of the Solution
-
-The solution expands the foundational query compiler into a query optimizer capable of heuristics-based evaluation and indexed search, consisting of the following key implementations:
-
-### Query Optimization (`BetterQueryPlanner`)
-- **Predicate Classification**: Distinguishes single-table selection predicates from cross-table join predicates.
-- **Selection Pushdown**: Early evaluation constraint. Single-table predicates are immediately applied to `TablePlan` forming a restricted `SelectPlan`. This shrinks the intermediate nested loops required.
-- **Left-Deep Join Tree & Theta Joins**: Dynamically reorders cross products sequentially starting from the table offering the smallest block estimation. Iteratively constructs sequential products (`ProductPlan(product_plan, next_table)`) exclusively pairing elements with applicable mapping conditions (`multi_table_preds`) ensuring a tightly coupled inner join and skipping uncontrolled combinations.
-
-### Index Structures (`BTreeIndex` & `CompositeIndex`)
-- **Memory-Oriented B+ Tree Implementation**: A custom generic sequence-based B+ Tree algorithm (`BTreeInternal` & `BTreeLeaf`) dictates data alignment spanning insertions (`insert()`), capacity bounds splits (`_split()`), and recursive key navigation (`search()`), caching specific `RecordID` payloads.
-- **Composite Index**: Automatically extends the structured indexing principles to allow multi-attribute parameterizations. Matches tuples of varying structures uniformly against multi-level dependencies.
-
-### Query Engine Integration (`IndexQueryPlanner`)
-- **`IndexScan` Delegation**: Introduces an efficient substitution mechanism to standard data scraping routines via directly resolving targeted `RecordID` parameters mapping tightly back down to physical block bounds (`moveToRecordID`).
-- **Index Hijacking Validation**: Replaces naive nested loop targets globally inside the planner sequence. Intercepts queries bearing strictly explicit parameters mapping accurately back towards instantiated index caches, reducing iteration domains from $O(N)$ back down to practically zero margins.
+All of our optimizations are fully contained within our `solution.py` implementation.
 
 ---
 
-## 3. Observations
+## 2. Design of the Solution & Optimizations Implemented
 
-1. **Catastrophic Pipeline Accumulations**: During original iterations, sequential `ProductPlan()` bindings forming *Right-Deep* configurations invoked endless buffer thrashing via `beforeFirst()` restarts. Shifting the schema toward *Left-Deep* alignment significantly suppressed loop execution counts.
-2. **Exponential Complexity Mitigation**: The unoptimized base implementations produced cross joins across $N$ table sets resulting in $O(N^4)$ evaluations for complex scopes scaling past millions. Optimization pipelines effectively restricted traversals safely down to proportional sizes mapped linearly.
-3. **Index Access Impact Layering**: Indexing provided significant latency recovery mapping isolated parameterizations successfully (E.g., $CS$ scopes, $Fall-2024$ scopes), but scaled redundantly when paired with broad unbounded join hierarchies unless actively reordered (e.g., `full` mode mapping optimization alongside indices providing the maximum delta). 
+In this project, our objective was to optimize how pySimpleDB parses and accesses queried disk information. We realized very quickly that the default implementations suffer hugely because of how relational algebra translates unoptimized into computational loops. 
+
+### 2.1 Query Optimization (`BetterQueryPlanner`)
+
+**The Pitfall (Baseline Model):**  
+Without optimization, the database executes a blind cross-product of all tables before filtering out invalid rows. For $Q1$ (joining Student, Enrollment, Section, and Course), this meant a sequential evaluation loop scanning over 300 million combinations! This causes the baseline approach to simply block resources and timeout endlessly.
+
+Another subtle pitfall we discovered inside standard multi-layered Cross-Products is a "Right-Deep Join Tree" consequence. Nesting pipelines recursively backwards severely punished memory blocks by causing nested loops to repeatedly invoke `beforeFirst()` and rewind complex data sets millions of times over. 
+
+**Our Optimization:**
+1. **Selection Pushdown**: Instead of waiting to filter *after* the joins, our code actively groups specific single-table terms separately (like `c_department = 'CS'`). We instantly map these parameters on top of the physical `TablePlan` forming a `SelectPlan`, thereby radically shrinking table volumes before they ever touch a Cartesian product.
+2. **Greedy Join Reordering (Left-Deep Tree)**: Inside `BetterQueryPlanner`, we sort table iterations dynamically querying the smallest tables first (`recordsOutput()`). More importantly, we enforced a pure **Left-Deep configuration** (`ProductPlan(product_plan, next_table)`). This guarantees we ONLY rewind simple base-table iteration pointers rather than rewinding massive nested pipelines throughout our evaluations. We subsequently apply matching multi-variable join terms identically acting natively as `Theta-Joins`.
+
+### 2.2 Indexing Structures (`BTreeIndex` & `CompositeIndex`)
+
+**The Pitfall:**  
+Even when isolated via Selection Pushdown limitations, standard Database evaluation utilizes `TableScan`, crawling $O(N)$ times down sequential block spaces sequentially.
+
+**Our Optimization:**
+Using standard principles modeled off external schemas, we created an in-memory B+ Tree abstraction matching our `solution.py` layout arrays. Incorporating `BTreeInternal` branches isolating logical nodes cleanly against strictly sorted arrays inside `BTreeLeaf` structures.
+We map identical insertion splits and logarithmic `bisect` logic seamlessly treating `CompositeIndex` variables elegantly utilizing python Tuple structs targeting direct underlying file boundaries (`RecordID`).
+
+### 2.3 Query Engine Integration (`IndexQueryPlanner`)
+
+**The Pitfall:**  
+Having an Index layout active is functionally useless unless the execution planner reliably recognizes when to intercept explicit sequential access calls.
+
+**Our Optimization:**
+Inside the `IndexQueryPlanner`, we search explicit equality variables matching our index keys precisely ($e.g.,$ `e_grade = 'NC'`). When intercepted cleanly, we hijack normal behavior returning an overarching `IndexScanWrapper`. Standard nested loops are instantly substituted across the platform converting blindly recursive loops into cleanly targeted jump sequences via `moveToRecordID(rid)`, fetching payloads practically immediately.
 
 ---
 
-## 4. Performance Table
+## 3. Performance Analysis & Observations
 
-The following benchmarks demonstrate the execution timing for the respective modes. 
+During testing, we aggressively utilized timing benchmarks mapping how our heuristics resolved latency boundaries natively.
 
 | Query | baseline | opt | index | full |
 | ----- | -------- | --- | ----- | ---- |
@@ -54,8 +66,14 @@ The following benchmarks demonstrate the execution timing for the respective mod
 | **Q2**| 0.2225 s | 0.0473 s | 0.0425 s | 0.0419 s |
 | **Q3**| 0.0689 s | 0.0108 s | 0.0078 s | 0.0074 s |
 
-*(Note: Q1 involves four heavily joined tables leading purely nested `baseline` approaches and unmodified join orders in `index` mode directly toward loop exhaustion bounds mapping to extremely volatile iteration footprints exceeding manageable timeouts. Time metrics for unblocked phases derived from executing benchmark iterations under Windows environment timing loops).*
+*(Note: Data points compiled testing against randomly dispersed data chunks mapping the identical testing architectures given. Timeouts assumed when iterative bounds exceed maximum limits mapping strictly >5 full seconds).*
 
-## 5. Directory Integrity
-- Handcoded changes strictly affect `solution.py` with zero reliance strictly tied arbitrarily to explicit `Record`, `Metadata` schema defaults outside universally parsed index definitions.
-- Report packaged correctly under standard reporting formats ready for submission zip bundling along with target source definitions.
+### Understanding the Execution Times
+
+- **Why does Q1 timeout in both `baseline` and `index` modes?**
+  $Q1$ involves combining 4 heavily filled iterations linking `Student(100)` x `Enrollment(500)` x `Section(300)` x `Course(20)`. The `baseline` execution cascades out yielding 300,000,000 blind combinations triggering massive memory limitations forcing a total timeout. 
+  What is interesting is that `index` mode similarly times out. This is because **pure integration indexing solves point queries, not join explosions**. Without join-reordering and Left-Deep logic natively mapping boundaries, tracking indices merely speeds up the individual checks but still inherently creates 300M+ combination evaluations under the Right-Deep umbrella! 
+- **The True Optimizer (`opt` mode):**
+  It explicitly shines inside the latency tables returning flawlessly at **0.22s**. Using precise theta-join ordering coupled heavily against Selection Pushdowns guarantees the 300 million items scale seamlessly down isolating solely viable subsets iteratively.
+- **Index Interception Prowess:**
+  When utilized specifically over filtered subsets ($Q2$ scaling `Student` vs `Enrollment`) or tightly bound composite targets ($Q3$ resolving explicitly against Fall & 2024 tuples), the index mapping avoids linear TableScans completely. Accessing targeted memory boundaries isolates response margins optimally dropping base queries from ~0.06s down to fractions rounding ~0.007s mapping almost infinite potential retrieval capacities against localized clusters.
