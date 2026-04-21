@@ -1,0 +1,32 @@
+Removing existing database directory: /Users/nischalreddymuthumula/Desktop/pySimpleDB/benchmarkdb
+Initializing Database...
+Created new db...
+Creating schemas...
+Populating database...
+Inserting Students (100)...
+Inserting Instructors (50)...
+Inserting Courses (20)...
+Inserting Sections (300)...
+Inserting Enrollments (500)...
+Database populated successfully!
+
+======================================================================
+  MODE: Baseline (no optimization, no indexes)
+  QUERIES: Q3
+======================================================================
+
+------------------------------------------------------------
+  Q3 | Mode: baseline
+  Query: select i_id, i_name from Instructor, Section where i_id = sec_instructor_id and sec_semester = 'Fall' and sec_year = 2024
+------------------------------------------------------------
+  [OK] Rows returned   : 25
+  [OK] Time            : 0.0350 seconds
+  [OK] Block accesses  : 310
+
+======================================================================
+  SUMMARY — Mode: baseline
+======================================================================
+  Query    Rows     Time (s)     Accesses    
+  ------------------------------------------------------------
+  Q3       25       0.0350       310         
+

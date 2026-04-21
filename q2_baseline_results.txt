@@ -1,0 +1,32 @@
+Removing existing database directory: /Users/nischalreddymuthumula/Desktop/pySimpleDB/benchmarkdb
+Initializing Database...
+Created new db...
+Creating schemas...
+Populating database...
+Inserting Students (100)...
+Inserting Instructors (50)...
+Inserting Courses (20)...
+Inserting Sections (300)...
+Inserting Enrollments (500)...
+Database populated successfully!
+
+======================================================================
+  MODE: Baseline (no optimization, no indexes)
+  QUERIES: Q2
+======================================================================
+
+------------------------------------------------------------
+  Q2 | Mode: baseline
+  Query: select s_id, s_name from Student, Enrollment where s_id = e_student_id and e_grade = 'NC'
+------------------------------------------------------------
+  [OK] Rows returned   : 86
+  [OK] Time            : 0.1152 seconds
+  [OK] Block accesses  : 1011
+
+======================================================================
+  SUMMARY — Mode: baseline
+======================================================================
+  Query    Rows     Time (s)     Accesses    
+  ------------------------------------------------------------
+  Q2       86       0.1152       1011        
+
